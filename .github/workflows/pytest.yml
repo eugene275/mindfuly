@@ -1,0 +1,41 @@
+name: pytest
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+   
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker
+        run: |
+          sudo systemctl start docker
+          docker --version
+
+      - name: Create .env file
+        run: |
+          echo "POSTGRES_HOST=db" >> .env
+          echo "POSTGRES_USER=username" >> .env
+          echo "POSTGRES_PASSWORD=password" >> .env
+           
+      - name: Build and Start Containers
+        run: |
+          docker compose up -d --build
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.3"   
+
+      - name: Run migrations
+        run: docker compose exec web alembic upgrade head
+        
+      - name: Run Pytest (unit tests)
+        run: 
+          docker compose exec web pytest 

@@ -1,0 +1,1 @@
+git+https://github.com/JovKun/user_service_v2.git@main#egg=user_service_v2
