@@ -5,6 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /uvx /bin/
 COPY . /app
 WORKDIR /app
 RUN pip install -e .
+RUN pip install python-jose[cryptography]
 
 ARG GITHUB_TOKEN
 

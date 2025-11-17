@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from src.mindfuly.routes import authorization, users, mood, spotify, weather
 
@@ -15,4 +16,9 @@ app.include_router(mood.router)
 app.include_router(spotify.router)
 app.include_router(weather.router)
 
-ui.run_with(app, mount_path="/", favicon="💭", title="Mindfuly")
+ui.run_with(
+    app,
+    mount_path="/",
+    favicon="💭",
+    title="Mindfuly"
+)
