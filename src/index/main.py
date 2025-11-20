@@ -85,7 +85,7 @@ async def login_page(user_repo: UserRepositoryV2 = Depends(get_user_repository_v
                     ''')
                     
                     ui.notify('Login successful!', color='green')
-                    ui.navigate.to(f"/users/{username_input.value}/home?geo=1")
+                    ui.navigate.to(f"/users/{username_input.value}/home")
                     
                 else:
                     error_label.text = "Invalid password. Please try again."
@@ -173,7 +173,7 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
         return
     
     # Navbar with logout
-    with ui.header().classes('justify-between items-center px-4 py-6 hover:shadow-lg transition-all duration-200 color: red'):
+    with ui.header().classes('justify-between items-center px-4 py-6 hover:shadow-lg transition-all duration-200'):
         ui.label('Mindfuly - Your Daily Wellness Tracker').classes('text-2xl font-bold')
         with ui.row().classes("gap-15 items-center"):
             ui.link("Overview", f"/users/{username}/home").classes("text-white text-lg no-underline")
