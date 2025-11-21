@@ -217,13 +217,16 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
             ui.button("1-Min Refresher").classes("w-full mb-2 bg-blue-500 text-white")
             ui.button("3-Min Calm Down").classes("w-full bg-blue-500 text-white")
 
-        # Daily Overview + Weather
+        # Daily Tip + Weather
         with ui.card().classes("flex-1 p-6 shadow rounded-2xl h-full border items-center"):
             ui.label("Daily Summary").classes("text-xl font-bold mb-4 text-center")
 
             with ui.column().classes("items-center mb-4"):
-                ui.label("😊").classes("text-6xl mb-2")
-                ui.label("Weather for the day.").classes("text-gray-600")
+                weather_icon = ui.label("🌍").props("id=weather-icon") \
+                .classes("text-6xl mb-2")
+                weather_label = ui.label("Loading weather...") \
+                .classes("text-gray-600") \
+                .props("id=weather-text")
 
             with ui.column().classes("bg-yellow-50 rounded-xl border p-4"):
                 ui.label("Daily Tip").classes("font-semibold mb-1")
@@ -234,3 +237,81 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
         ui.label("What's on your mind today?").classes("text-xl font-bold mb-4")
         textarea = ui.textarea(placeholder="Write your notes here...").classes("w-full mb-4").props("outlined autogrow rows=4")
         ui.button("SAVE NOTES", on_click=lambda: ui.notify("Note Submitted!")).classes("bg-blue-500 text-white w-full py-2 rounded-lg")
+
+    
+    
+    
+    # Weather 
+    await ui.run_javascript('''
+
+        setTimeout(() => {
+
+                            
+            function get_emoji(desc) {
+                desc = desc.toLowerCase();
+
+                if (desc.includes("clear")) return "☀️";
+                if (desc.includes("sun")) return "☀️";    
+                if (desc.includes("cloud")) return "☁️";            
+                if (desc.includes("overcast")) return "☁️";            
+                if (desc.includes("shower")) return "🌧️";           
+                if (desc.includes("rain")) return "🌧️";            
+                if (desc.includes("storm")) return "⛈️";
+                if (desc.includes("thunder")) return "⛈️";
+                if (desc.includes("snow")) return "🌨️";
+                if (desc.includes("clear")) return "☀️";
+                if (desc.includes("fog")) return "🌫️";
+                if (desc.includes("mist")) return "🌫️";
+                            
+                return "🌍";
+            }
+            
+
+            const label = document.getElementById('weather-text');
+            const icon = document.getElementById('weather-icon');
+                            
+            if (!label || !icon ) {
+                console.log("NO WEATHER LABEL FOUND");
+                return;
+            }
+
+            if (!navigator.geolocation) {
+                label.innerText = 'Geolocation not supported';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(async function(pos) {
+
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+
+                console.log("Got location:", lat, lon);  // <-- debugging
+
+                const resp = await fetch(`/weather?lat=${lat}&lon=${lon}`);  //sends coordinates to backend (weather.py)
+                const data = await resp.json();
+
+                const desc = (data.weather?.[0]?.description) || 'Unknown';
+                const temp = data.main?.temp ? Math.round(data.main.temp) : null;
+                            
+                icon.innerText = get_emoji(desc);
+
+                if (temp !== null) {
+                    label.innerText = `${temp}°C – ${desc}`;
+                } else {
+                    label.innerText = desc;
+                }
+
+            }, function(err) {
+                label.innerText = 'Location denied';
+            }, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 5000
+            });
+
+        }, 300);  // <-- 300ms delay FIXES NiceGUI timing issues
+    ''')
+
+
+
+

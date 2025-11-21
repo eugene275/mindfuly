@@ -25,11 +25,15 @@ services:
         restart: true
     ports:
       - "8200:8200"
+
+    env_file:
+      - .env
     environment:
       DATABASE_HOST: db # The service name of your Postgres container
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      WEATHER_API_KEY: ${WEATHER_API_KEY}
     develop:
       watch:
         - action: sync+restart
