@@ -8,8 +8,8 @@ import copy
 from datetime import timedelta
 from typing import Optional
 
-from src.mindfuly.routes.users import create_user
-from user_service_v2.models.user import UserSchema, get_user_repository_v2, UserRepositoryV2
+from user_service_v2.models.user import get_user_repository_v2, UserRepositoryV2
+from src.shared.models import get_mood_log_repository_v2, MoodLogRepositoryV2
 from src.mindfuly.auth.jwt_utils import create_access_token, verify_token
 
 logger = logging.getLogger('uvicorn.error')
@@ -159,7 +159,7 @@ async def user_overview_page(user_repo: UserRepositoryV2 = Depends(get_user_repo
 
 
 @ui.page("/users/{username}/home")
-async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
+async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2), mood_log_repo = Depends(get_mood_log_repository_v2)):
     # Verify user is authenticated and accessing their own page
     authenticated_user = await require_auth(username)
     if not authenticated_user:
@@ -210,11 +210,19 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
                 textarea = ui.textarea(placeholder="Write your notes here...").classes("w-full mb-4").props("outlined autogrow rows=4")
 
                 # Make it so that the textarea cannot be empty before submitting
-                def submit_notes():
+                async def submit_notes():
                     if not textarea.value.strip():
                         ui.notify("Please write something before submitting.", color="red")
                     else:
                         ui.notify("Note Submitted!", color="green")
+
+                        await mood_log_repo.create_mood_log(
+                            user_id=user.id,
+                            mood_value=slider.value,
+                            energy_level=slider.value,  # Assuming energy level is the same as mood for now
+                            notes=textarea.value,
+                            weather=None  # You can replace this with actual weather data if available
+                        )
 
             with ui.column().classes("w-full items-center mt-6"):
                 ui.button("Submit!", on_click=submit_notes).classes("bg-blue-500 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-600")
@@ -317,7 +325,7 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
     ''')
 
 @ui.page("/users/{username}/journal")
-async def user_journal_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
+async def user_journal_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2), mood_log_repo = Depends(get_mood_log_repository_v2)):
 
     # Verify user is authenticated and accessing their own page
     authenticated_user = await require_auth(username)
@@ -347,6 +355,16 @@ async def user_journal_page(username: str, user_repo: UserRepositoryV2 = Depends
     with ui.column().classes('w-full items-center mt-10 mb-8'):
         ui.label(f"{username}'s Journal").classes('text-4xl font-bold text-center mb-1')
 
+    mood_logs = await mood_log_repo.get_mood_logs(user.id, limit=20)
+
     # Placeholder for journal entries
     with ui.column().classes('w-full max-w-4xl mx-auto'):
-        ui.label("Your journal entries will appear here.").classes('text-lg text-gray-600')
+        if not mood_logs:
+            ui.label("No journal entries found. Start logging your mood today!").classes("text-gray-600 italic")
+        for log in mood_logs:
+            with ui.card().classes("w-full mb-4 p-4 shadow rounded-lg border"):
+                with ui.row().classes("justify-between items-center mb-2"):
+                    ui.label(f"Mood Value: {log.mood_value}").classes("font-semibold")
+                    ui.label(f"Energy Level: {log.energy_level}").classes("font-semibold")
+                    ui.label(f"Logged on: {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}").classes("text-gray-500 text-sm")
+                ui.label(f"Notes: {log.notes}").classes("mt-2")
