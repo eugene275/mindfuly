@@ -177,7 +177,7 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
             ui.link("Overview", f"/users/{username}/home").classes("text-white text-lg no-underline")
             ui.link("Journal", f"/users/{username}/journal").classes("text-white text-lg no-underline")
             ui.link("My Analytics", f"/users/{username}/analytics").classes("text-white text-lg no-underline")
-            ui.link("Settings", "#").classes("text-white text-lg no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("text-white text-lg no-underline")
             ui.button('Logout', on_click=lambda: handle_logout(), icon='logout').classes('bg-red-500 ml-4')
 
     async def handle_logout():
@@ -427,7 +427,7 @@ async def user_journal_page(username: str, user_repo: UserRepositoryV2 = Depends
             ui.link("Overview", f"/users/{username}/home").classes("text-white text-lg no-underline")
             ui.link("Journal", f"/users/{username}/journal").classes("text-white text-lg no-underline")
             ui.link("My Analytics", f"/users/{username}/analytics").classes("text-white text-lg no-underline")
-            ui.link("Settings", "#").classes("text-white text-lg no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("text-white text-lg no-underline")
             ui.button('Logout', on_click=lambda: handle_logout(), icon='logout').classes('bg-red-500 ml-4')
 
     async def handle_logout():
@@ -454,6 +454,7 @@ async def user_journal_page(username: str, user_repo: UserRepositoryV2 = Depends
 
 @ui.page("/users/{username}/analytics")
 async def user_analytics_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2), mood_log_repo = Depends(get_mood_log_repository_v2)):
+
     # Verify user is authenticated and accessing their own page
     authenticated_user = await require_auth(username)
     if not authenticated_user:
@@ -471,7 +472,7 @@ async def user_analytics_page(username: str, user_repo: UserRepositoryV2 = Depen
             ui.link("Overview", f"/users/{username}/home").classes("text-white text-lg no-underline")
             ui.link("Journal", f"/users/{username}/journal").classes("text-white text-lg no-underline")
             ui.link("My Analytics", f"/users/{username}/analytics").classes("text-white text-lg no-underline")
-            ui.link("Settings", "#").classes("text-white text-lg no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("text-white text-lg no-underline")
             ui.button('Logout', on_click=lambda: handle_logout(), icon='logout').classes('bg-red-500 ml-4')
 
     async def handle_logout():
@@ -577,3 +578,54 @@ async def user_analytics_page(username: str, user_repo: UserRepositoryV2 = Depen
                     }
                 ]
             })
+
+@ui.page("/users/{username}/settings")
+async def users_settings_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
+
+    # Verify user is authenticated and accessing their own page
+    authenticated_user = await require_auth(username)
+    if not authenticated_user:
+        return
+    
+    user = await user_repo.get_by_name(username)
+    if not user: 
+        ui.label("User not found.")
+        return
+    
+    # Navbar with logout
+    with ui.header().classes('justify-between items-center px-4 py-6 hover:shadow-lg transition-all duration-200'):
+        ui.label('Mindfuly - Your Daily Wellness Tracker').classes('text-2xl font-bold')
+        with ui.row().classes("gap-15 items-center"):
+            ui.link("Overview", f"/users/{username}/home").classes("text-white text-lg no-underline")
+            ui.link("Journal", f"/users/{username}/journal").classes("text-white text-lg no-underline")
+            ui.link("My Analytics", f"/users/{username}/analytics").classes("text-white text-lg no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("text-white text-lg no-underline")
+            ui.button('Logout', on_click=lambda: handle_logout(), icon='logout').classes('bg-red-500 ml-4')
+
+    async def handle_logout():
+        await ui.run_javascript('localStorage.clear()')
+        ui.notify('Logged out successfully', color='green')
+        ui.navigate.to('/home')
+
+    with ui.column().classes("w-full items-center mt-10"):
+        ui.label("User Settings").classes("text-3xl font-bold mb-6")
+
+        with ui.row().classes("w-full justify-center gap-10"):
+    
+            with ui.card().classes("w-full max-w-3xl p-8 shadow-md rounded-2xl border"):
+                ui.label("Account Information").classes("text-xl font-bold mb-4")
+                
+                with ui.column().classes("w-full p-4 mb-6 border border-gray-300/40 rounded-xl bg-gray-50/30"):
+                    ui.label(f"Username: {user.name}").classes("mb-2")
+                    ui.label(f"Email: {user.email}").classes("mb-4")
+
+                ui.label("Update Information").classes("text-xl font-bold mb-4")
+                name_input = ui.input("Display name", value=user.name).classes("mb-3 w-full")
+                email_input = ui.input("Email", value=user.email).classes("mb-3 w-full")
+                ui.button("Save changes", on_click=lambda: ui.notify("Not wired yet"))
+        
+    
+            with ui.column().classes("basis-1/2"):
+                with ui.card().classes("w-full p-8 border shadow rounded-2xl"):
+                    ui.label("Danger Zone").classes("text-xl font-bold mb-4 text-red-500")
+                    ui.button("Delete Account")
