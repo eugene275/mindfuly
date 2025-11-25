@@ -309,7 +309,7 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
             with ui.column().classes("w-full items-center mt-6"):
                 most_recent_log = await mood_log_repo.get_most_recent_log_date(user.id)
                 if most_recent_log:
-                    if datetime.utcnow().date() == most_recent_log.created_at.date():
+                    if datetime.utcnow().date() == most_recent_log.date():
                         ui.button("Edit!", on_click=edit_notes).classes("bg-blue-500 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-600")
                     else:
                         ui.button("Submit!", on_click=submit_notes).classes("bg-blue-500 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-600")
