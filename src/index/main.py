@@ -42,18 +42,37 @@ async def require_auth(username: str = None):
 
 @ui.page('/home')
 async def home_page():
-    with ui.column().classes('mx-auto'):
-        with ui.row().classes('w-full justify-center items-center px-4 mb-4'):
-            ui.label('Mindfuly').classes('text-2xl font-bold')
 
-        with ui.row().classes('w-full justify-between items-center mt-32 gap-4'):
+    # Navbar with logout
+    with ui.header().classes('justify-between items-center px-4 py-6 hover:shadow-lg transition-all duration-200'):
+        ui.label('Mindfuly - Your Daily Wellness Tracker').classes('text-2xl font-bold')
+        with ui.row().classes("gap-15 items-center"):
+            ui.link("Home", f"/home").classes("text-white text-lg no-underline")
+            ui.link("Login", f"/login").classes("text-white text-lg no-underline")
+            ui.link("Signup", f"/signup").classes("text-white text-lg no-underline")
+
+    with ui.column().classes('mx-auto mb-4 mt-20 items-center'):
+        ui.label('Welcome to Mindfuly!').classes('text-2xl font-bold')
+        ui.label('Your personal wellness tracker to monitor mood, energy, and more.').classes('text-gray-600')
+        ui.label('Get started by logging in or signing up below.').classes('text-gray-600 mb-8')
+
+        with ui.row().classes('w-full justify-center items-center mt-12 gap-12'):
             ui.button('Login', on_click=lambda: ui.navigate.to('/login')).classes('bg-blue-500')
             ui.button('Signup', on_click=lambda: ui.navigate.to('/signup')).classes('bg-blue-500')
 
 
 @ui.page("/login")
 async def login_page(user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
-    with ui.column().classes('mx-auto'):
+
+    # Navbar with logout
+    with ui.header().classes('justify-between items-center px-4 py-6 hover:shadow-lg transition-all duration-200'):
+        ui.label('Mindfuly - Your Daily Wellness Tracker').classes('text-2xl font-bold')
+        with ui.row().classes("gap-15 items-center"):
+            ui.link("Home", f"/home").classes("text-white text-lg no-underline")
+            ui.link("Login", f"/login").classes("text-white text-lg no-underline")
+            ui.link("Signup", f"/signup").classes("text-white text-lg no-underline")
+
+    with ui.column().classes('mx-auto mb-4 mt-20'):
         with ui.row().classes('w-full justify-center items-center px-4 mb-4'):
             ui.label('Login Page').classes('text-2xl font-bold mb-4')
 
@@ -110,7 +129,16 @@ async def login_page(user_repo: UserRepositoryV2 = Depends(get_user_repository_v
 
 @ui.page("/signup")
 async def signup_page(user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
-    with ui.column().classes('mx-auto'):
+    
+    # Navbar with logout
+    with ui.header().classes('justify-between items-center px-4 py-6 hover:shadow-lg transition-all duration-200'):
+        ui.label('Mindfuly - Your Daily Wellness Tracker').classes('text-2xl font-bold')
+        with ui.row().classes("gap-15 items-center"):
+            ui.link("Home", f"/home").classes("text-white text-lg no-underline")
+            ui.link("Login", f"/login").classes("text-white text-lg no-underline")
+            ui.link("Signup", f"/signup").classes("text-white text-lg no-underline")
+
+    with ui.column().classes('mx-auto mb-4 mt-20'):
         with ui.row().classes('w-full justify-center items-center px-4 mb-4'):
             ui.label('Signup Page').classes('text-2xl font-bold mb-4')
 

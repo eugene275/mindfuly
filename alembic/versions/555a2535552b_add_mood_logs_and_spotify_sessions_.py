@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('weather', sa.String(100), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_mood_logs_id'), 'mood_logs', ['id'], unique=False)
@@ -41,7 +41,7 @@ def upgrade() -> None:
         sa.Column('duration_minutes', sa.Float(), nullable=True),
         sa.Column('session_type', sa.String(50), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_spotify_sessions_id'), 'spotify_sessions', ['id'], unique=False)
