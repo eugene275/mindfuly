@@ -4,6 +4,7 @@ import logging
 import asyncio
 from datetime import timedelta
 from typing import Optional
+import httpx
 
 from src.mindfuly.routes.users import create_user
 from user_service_v2.models.user import UserSchema, get_user_repository_v2, UserRepositoryV2
@@ -334,7 +335,7 @@ async def user_overview_page(user_repo: UserRepositoryV2 = Depends(get_user_repo
 
 
 @ui.page("/users/{username}/home")
-async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
+async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2), mood_log_repo: MoodLogRepositoryV2 = Depends(get_mood_log_repository_v2)):
     # Verify user is authenticated and accessing their own page
     authenticated_user = await require_auth(username)
     if not authenticated_user:
@@ -408,23 +409,74 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
 
     with ui.row().classes("w-full max-w-7xl justify-center gap-8 mx-auto items-stretch px-4 mb-8"):
         # Mood Log
-        with ui.card().classes("dashboard-card basis-1/2 p-8 shadow-lg rounded-2xl border-0 bg-white items-center h-full"):
-            ui.label("Today's Mood Log").classes("text-3xl font-bold mb-2 text-center text-gray-800")
-            ui.label("Adjust the slider based on your mood!").classes("text-base text-gray-600 font-medium mb-8 text-center")
-            
-            with ui.row().classes("justify-center gap-25 mb-3 text-2xl"):
-                ui.label("😞")
-                ui.label("🙁")
-                ui.label("😐")
-                ui.label("🙂")
-                ui.label("😄")
+        with ui.card().classes("basis-1/2 p-4 shadow-md rounded-2xl border items-center h-full"):
+            ui.label("Today's Mood Log").classes("text-2xl font-bold mb-3 text-center")
 
-            with ui.column().classes('items-center w-full'):
-                slider = ui.slider(min=1, max=5, value=5).classes("w-full")
-                ui.label().bind_text_from(slider, 'value').classes("text-xl font-bold mt-4 text-center")
+            with ui.card().classes("w-full items-center"):
+                ui.label("How are you feeling today?").classes("text-lg text-gray-600 font-semibold mb-6 text-center")
+                
+                with ui.row().classes("justify-center gap-25 mb-3 text-2xl"):
+                    ui.label("😞")
+                    ui.label("🙁")
+                    ui.label("😐")
+                    ui.label("🙂")
+                    ui.label("😄")
 
-            with ui.column().classes("w-full items-center mt-6"):
-                ui.button("Submit!", on_click=lambda: ui.notify("Mood submitted!")).classes("bg-blue-500 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-600")
+                with ui.column().classes('items-center w-full'):
+                    mood_slider = ui.slider(min=1, max=5, value=5).classes("w-full")
+                    ui.label().bind_text_from(mood_slider, 'value').classes("text-xl font-bold mt-4 text-center")
+
+            with ui.card().classes("w-full items-center"):
+                ui.label("How pumped are you today?").classes("text-lg text-gray-600 font-semibold mb-6 text-center")
+                
+                with ui.row().classes("justify-center gap-25 mb-3 text-2xl"):
+                    ui.label("😴")
+                    ui.label("🥱")
+                    ui.label("😐")
+                    ui.label("😲")
+                    ui.label("🫨")
+
+                with ui.column().classes('items-center w-full'):
+                    energy_slider = ui.slider(min=1, max=5, value=5).classes("w-full")
+                    ui.label().bind_text_from(energy_slider, 'value').classes("text-xl font-bold mt-4 text-center")
+
+            with ui.card().classes("w-full items-center"):
+                ui.label("Why do you feel this way today?").classes("text-xl font-bold mb-4")
+                notes_textarea = ui.textarea(placeholder="Write your notes here...").classes("w-full mb-4").props("outlined autogrow rows=4")
+
+                async def submit_mood_log():
+                    # Get weather data from the weather label
+                    try:
+                        weather_text = await ui.run_javascript('document.getElementById("weather-text")?.innerText || ""', timeout=1.0)
+                        weather = weather_text if weather_text and weather_text != "Loading weather..." and weather_text.strip() else None
+                    except:
+                        weather = None
+                    
+                    mood_value = int(mood_slider.value)
+                    energy_level = int(energy_slider.value)
+                    notes = notes_textarea.value.strip() if notes_textarea.value and notes_textarea.value.strip() else None
+                    
+                    try:
+                        mood_log = await mood_log_repo.create_mood_log(
+                            user_id=user.id,
+                            mood_value=mood_value,
+                            energy_level=energy_level,
+                            notes=notes,
+                            weather=weather
+                        )
+                        if mood_log:
+                            ui.notify("Note Submitted!", color="green")
+                            # Clear the form
+                            mood_slider.value = 5
+                            energy_slider.value = 5
+                            notes_textarea.value = ""
+                        else:
+                            ui.notify('Failed to save journal entry. Please try again.', color='red', icon='error')
+                    except Exception as e:
+                        logger.error(f"Error saving mood log: {e}")
+                        ui.notify('Error saving journal entry. Please try again.', color='red', icon='error')
+
+                ui.button("Submit!", on_click=submit_mood_log).classes("bg-blue-500 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-600")
 
         # Music - YouTube Integration (Mood-Based)
         with ui.card().classes("dashboard-card basis-1/4 p-6 shadow-lg rounded-2xl h-full border-0 bg-white"):
@@ -484,11 +536,6 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
                 ui.label("Daily Tip").classes("font-semibold mb-1")
                 ui.label("You feel happy on a certain day... (example)").classes("text-gray-700")
 
-    # Notes
-    with ui.card().classes("w-full max-w-7xl mx-auto mt-10 p-6 shadow rounded-2xl items-center border"):
-        ui.label("What's on your mind today?").classes("text-xl font-bold mb-4")
-        textarea = ui.textarea(placeholder="Write your notes here...").classes("w-full mb-4").props("outlined autogrow rows=4")
-        ui.button("SAVE NOTES", on_click=lambda: ui.notify("Note Submitted!")).classes("bg-blue-500 text-white w-full py-2 rounded-lg")
 
     
     

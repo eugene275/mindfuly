@@ -222,18 +222,6 @@ class MoodLogRepositoryV2():
 
         self.session.commit()
 
-
-class SpotifySession(Base):
-    __tablename__ = "spotify_sessions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    track_name = Column(String(255), nullable=True)
-    artist_name = Column(String(255), nullable=True)
-    duration_minutes = Column(Float, nullable=True)
-    session_type = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
 def get_mood_log_repository_v2(db: Session = Depends(get_db)) -> MoodLogRepositoryV2:
     return MoodLogRepositoryV2(db)
 

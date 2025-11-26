@@ -31,25 +31,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_mood_logs_id'), 'mood_logs', ['id'], unique=False)
-    
-    op.create_table(
-        'spotify_sessions',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('track_name', sa.String(255), nullable=True),
-        sa.Column('artist_name', sa.String(255), nullable=True),
-        sa.Column('duration_minutes', sa.Float(), nullable=True),
-        sa.Column('session_type', sa.String(50), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_spotify_sessions_id'), 'spotify_sessions', ['id'], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_spotify_sessions_id'), table_name='spotify_sessions')
-    op.drop_table('spotify_sessions')
     op.drop_index(op.f('ix_mood_logs_id'), table_name='mood_logs')
     op.drop_table('mood_logs')
 
