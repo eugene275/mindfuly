@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from collections import defaultdict
+import calendar
 
 from src.shared.database import get_db
 
@@ -132,7 +134,36 @@ class MoodLogRepositoryV2():
         ...
         """
 
-        return None
+        result = self.session.execute(
+            select(MoodLog).where(MoodLog.user_id == user_id)
+        )
+        logs = result.scalars().all()
+
+        weekday_groups = defaultdict(list)
+
+        for log in logs:
+            weekday_number = log.created_at.weekday()
+            weekday_name = calendar.day_name[weekday_number]
+            weekday_groups[weekday_name].append(log)
+
+        weekly_stats = []
+
+        for day, logs_for_day in weekday_groups.items():
+            if len(logs_for_day) == 0:
+                continue
+
+            avg_mood = sum(log.mood_value for log in logs_for_day) / len(logs_for_day)
+            avg_energy = sum(log.energy_level for log in logs_for_day) / len(logs_for_day)
+            total_logs = len(logs_for_day)
+
+            weekly_stats.append({
+                "day": day,
+                "avg_mood": avg_mood,
+                "avg_energy": avg_energy,
+                "total_logs": total_logs,
+            })
+
+        return weekly_stats
     
     # Get average mood, energy level, and total logs for each weather condition
     async def get_weather_mood_stats(self, user_id: int) -> list[dict]:

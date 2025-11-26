@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pydantic import parse_obj_as
 from contextlib import contextmanager
 import logging, asyncio
-import copy
+import copy, random
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -18,7 +18,7 @@ logger = logging.getLogger('uvicorn.error')
 async def require_auth(username: str = None):
     """Check if user is authenticated via JWT token in localStorage"""
     # Get token from JavaScript localStorage
-    token = await ui.run_javascript('localStorage.getItem("token")', timeout=1.0)
+    token = await ui.run_javascript('localStorage.getItem("token")')
     
     if not token:
         ui.navigate.to('/login')
@@ -365,6 +365,7 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
 
             with ui.column().classes("bg-yellow-50 rounded-xl border p-4"):
                 weather_stats = await mood_log_repo.get_weather_mood_stats(user.id)
+                weekly_stats = await mood_log_repo.get_weekly_mood_stats(user.id)
                 
                 def get_max_mood_weather(weather_stats):
                     if not weather_stats:
@@ -373,8 +374,80 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
                     max_entry = max(weather_stats, key=lambda x: x["avg_mood"])
                     return max_entry["weather"]
 
+                def get_min_mood_weather(weather_stats):
+                    if not weather_stats:
+                        return "no data available yet."
+
+                    min_entry = min(weather_stats, key = lambda x: x["avg_mood"])
+                    return min_entry["weather"]
+
+                def get_neutral_mood_weather(weather_stats):
+                    if not weather_stats:
+                        return "no data available yet."
+
+                    neutral_entry = min(weather_stats, key=lambda x: abs(x["avg_mood"] - 3))
+                    return neutral_entry["weather"]
+
+                def get_happiest_day(weekly_stats):
+                    if not weekly_stats:
+                        return "no data available yet."
+                    
+                    best_day = max(weekly_stats, key=lambda x: x["avg_mood"])
+                    return best_day["day"]
+
+                def get_saddest_day(weekly_stats):
+                    if not weekly_stats:
+                        return "no data available yet."
+
+                    saddest_day = min(weekly_stats, key = lambda x: x["avg_mood"])
+                    return saddest_day["day"]
+
+                def get_neutral_day(weekly_stats):
+                    if not weekly_stats:
+                        return "no data available yet."
+
+                    neutral_day = min(weekly_stats, key= lambda x: abs(x["avg_mood"] - 3))
+                    return neutral_day["day"]
+
+
                 ui.label("Daily Tip").classes("font-semibold mb-1")
-                ui.label(f"You feel the most happy when it is {get_max_mood_weather(weather_stats)}").classes("text-gray-700")
+
+
+                insights_mood_weather = []
+                
+                if (len(weather_stats) >= 1):
+                    happiest_mood_weather = get_max_mood_weather(weather_stats)
+                    saddest_mood_weather = get_min_mood_weather(weather_stats)
+                    neutral_mood_weather = get_neutral_mood_weather(weather_stats)
+
+                    insights_mood_weather.append(f"You tend to feel the most happy when it is {happiest_mood_weather}")
+                    insights_mood_weather.append(f"You tend to feel the saddest when it is {saddest_mood_weather}")
+                    insights_mood_weather.append(f"You tend to feel neutral when it is {neutral_mood_weather}")
+
+                    chosen_insight1 = random.choice(insights_mood_weather)
+                    ui.label(chosen_insight1).classes("text-gray-700")
+
+                else:
+                    ui.label("Not enough data for personalized insight.").classes("text-gray-700")
+
+
+                insights_weekly_mood = []
+
+                if (len(weekly_stats) >= 1):
+                    happiest_day = get_happiest_day(weekly_stats)
+                    saddest_day = get_saddest_day(weekly_stats)
+                    neutral_day = get_neutral_day(weekly_stats)
+
+                    insights_weekly_mood.append(f"You tend to feel the happiest on {happiest_day}")
+                    insights_weekly_mood.append(f"You tend to feel the saddest on {saddest_day}")
+                    insights_weekly_mood.append(f"You tend to feel the most neutral on {neutral_day}")
+
+                    chosen_insight2 = random.choice(insights_weekly_mood)
+                    ui.label(chosen_insight2).classes("text-gray-700 mt-1")
+
+                else:
+                    ui.label("Not enough data for personalized insight.").classes("text-gray-700 mt-1")
+
     
     # Weather 
     await ui.run_javascript('''
