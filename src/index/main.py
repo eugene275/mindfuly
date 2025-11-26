@@ -1,11 +1,13 @@
 from fastapi import Depends, HTTPException
 from nicegui import ui
 import logging
+import asyncio
 from datetime import timedelta
 from typing import Optional
 
 from src.mindfuly.routes.users import create_user
 from user_service_v2.models.user import UserSchema, get_user_repository_v2, UserRepositoryV2
+from src.shared.models import get_mood_log_repository_v2, MoodLogRepositoryV2
 from src.mindfuly.auth.jwt_utils import create_access_token, verify_token
 
 logger = logging.getLogger('uvicorn.error')
@@ -385,8 +387,9 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
             ui.label('Mindfuly').classes('text-2xl font-bold text-white')
         with ui.row().classes("gap-6 items-center"):
             ui.link("Overview", f"/users/{username}/home").classes("nav-link text-white text-base font-medium no-underline")
-            ui.link("Analytics", "#").classes("nav-link text-white text-base font-medium no-underline")
-            ui.link("Settings", "#").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Journal", f"/users/{username}/journal").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Analytics", f"/users/{username}/analytics").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("nav-link text-white text-base font-medium no-underline")
             ui.button('🚪 Logout', on_click=lambda: handle_logout()).classes('bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium')
 
     async def handle_logout():
@@ -909,6 +912,367 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
             
         }}, 500);
     ''', timeout=5.0)
+
+
+@ui.page("/users/{username}/journal")
+async def user_journal_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2), mood_log_repo: MoodLogRepositoryV2 = Depends(get_mood_log_repository_v2)):
+    authenticated_user = await require_auth(username)
+    if not authenticated_user:
+        return
+    
+    user = await user_repo.get_by_name(username)
+    if not user: 
+        ui.label("User not found.")
+        return
+    
+    ui.add_head_html('''
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                min-height: 100vh;
+            }
+            .dashboard-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            }
+            .nav-link {
+                transition: all 0.3s ease;
+                padding: 8px 16px;
+                border-radius: 8px;
+            }
+            .nav-link:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            .dashboard-card {
+                transition: all 0.3s ease;
+                border-radius: 16px;
+                background: white;
+            }
+            .dashboard-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            }
+        </style>
+    ''')
+    
+    with ui.header().classes('dashboard-header justify-between items-center px-8 py-4'):
+        with ui.row().classes('items-center gap-2'):
+            ui.label('💭').classes('text-3xl')
+            ui.label('Mindfuly').classes('text-2xl font-bold text-white')
+        with ui.row().classes("gap-6 items-center"):
+            ui.link("Overview", f"/users/{username}/home").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Journal", f"/users/{username}/journal").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Analytics", f"/users/{username}/analytics").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("nav-link text-white text-base font-medium no-underline")
+            ui.button('🚪 Logout', on_click=lambda: handle_logout()).classes('bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium')
+
+    async def handle_logout():
+        await ui.run_javascript('localStorage.clear()')
+        ui.notify('Logged out successfully', color='green', icon='check_circle')
+        ui.navigate.to('/home')
+
+    with ui.column().classes('w-full items-center mt-10 mb-8 px-4'):
+        ui.label(f"{username}'s Journal").classes('text-4xl font-bold text-center mb-1 text-gray-800')
+
+    mood_logs = await mood_log_repo.get_mood_logs(user.id, limit=20)
+
+    with ui.column().classes('w-full max-w-4xl mx-auto px-4'):
+        if not mood_logs:
+            with ui.card().classes('dashboard-card p-8 text-center'):
+                ui.label("No journal entries found. Start logging your mood today!").classes("text-gray-600 italic text-lg")
+        else:
+            for log in mood_logs:
+                with ui.card().classes("dashboard-card p-6 mb-4"):
+                    with ui.row().classes("justify-between items-center mb-2"):
+                        ui.label(f"Mood: {log.mood_value}").classes("font-semibold text-lg text-purple-600")
+                        ui.label(f"Energy: {log.energy_level}").classes("font-semibold text-lg text-blue-600")
+                        ui.label(f"Created on: {log.created_at.date()}").classes("text-gray-500 text-sm")
+                    if log.notes:
+                        ui.label(log.notes).classes("mt-2 text-gray-700")
+
+
+@ui.page("/users/{username}/analytics")
+async def user_analytics_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2), mood_log_repo: MoodLogRepositoryV2 = Depends(get_mood_log_repository_v2)):
+    authenticated_user = await require_auth(username)
+    if not authenticated_user:
+        return
+    
+    user = await user_repo.get_by_name(username)
+    if not user: 
+        ui.label("User not found.")
+        return
+    
+    ui.add_head_html('''
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                min-height: 100vh;
+            }
+            .dashboard-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            }
+            .nav-link {
+                transition: all 0.3s ease;
+                padding: 8px 16px;
+                border-radius: 8px;
+            }
+            .nav-link:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            .dashboard-card {
+                transition: all 0.3s ease;
+                border-radius: 16px;
+                background: white;
+            }
+            .dashboard-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            }
+        </style>
+    ''')
+    
+    with ui.header().classes('dashboard-header justify-between items-center px-8 py-4'):
+        with ui.row().classes('items-center gap-2'):
+            ui.label('💭').classes('text-3xl')
+            ui.label('Mindfuly').classes('text-2xl font-bold text-white')
+        with ui.row().classes("gap-6 items-center"):
+            ui.link("Overview", f"/users/{username}/home").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Journal", f"/users/{username}/journal").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Analytics", f"/users/{username}/analytics").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("nav-link text-white text-base font-medium no-underline")
+            ui.button('🚪 Logout', on_click=lambda: handle_logout()).classes('bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium')
+
+    async def handle_logout():
+        await ui.run_javascript('localStorage.clear()')
+        ui.notify('Logged out successfully', color='green', icon='check_circle')
+        ui.navigate.to('/home')
+
+    with ui.column().classes('w-full items-center mt-10 mb-8 px-4'):
+        ui.label(f"{username}'s Analytics").classes('text-4xl font-bold text-center mb-1 text-gray-800')
+
+    running_means = await mood_log_repo.get_running_means(user.id, limit=20)
+    mood_logs = await mood_log_repo.get_mood_logs(user.id, limit=20)
+
+    if not mood_logs:
+        with ui.card().classes('dashboard-card p-8 text-center max-w-4xl mx-auto mt-6'):
+            ui.label("Not enough data to display analytics. Start logging your mood today!").classes("text-gray-600 italic text-lg")
+    else:
+        dates = [entry["date"] for entry in running_means][::-1]
+        mood_values = [entry["avg_mood"] for entry in running_means][::-1]
+        energy_values = [entry["avg_energy"] for entry in running_means][::-1]
+
+        with ui.card().classes("dashboard-card p-6 max-w-4xl mx-auto mt-6"):
+            with ui.row().classes("justify-center w-full mb-4"):
+                ui.label("Your Mood and Energy").classes("text-xl font-bold text-center text-gray-800")
+            
+            ui.echart({
+                "tooltip": {
+                    "trigger": "axis"
+                },
+                "legend": {
+                    "data": ["Mood Logs", "Energy Logs"]
+                },
+                "xAxis": {
+                    "type": "category",
+                    "data": [log.created_at.date().isoformat() for log in mood_logs][::-1]
+                },
+                "yAxis": {
+                    "type": "value",
+                    "min": 1,
+                    "max": 5
+                },
+                "series": [
+                    {
+                        "name": "Mood Logs",
+                        "type": "scatter",
+                        "data": [log.mood_value for log in mood_logs][::-1],
+                        "itemStyle": {
+                            "color": "#42A5F5"
+                        }
+                    },
+                    {
+                        "name": "Energy Logs",
+                        "type": "scatter",
+                        "data": [log.energy_level for log in mood_logs][::-1],
+                        "itemStyle": {
+                            "color": "#66BB6A"
+                        }
+                    }
+                ]
+            })
+
+        with ui.card().classes("dashboard-card p-6 max-w-4xl mx-auto mt-6"):
+            with ui.row().classes("justify-center w-full mb-4"):
+                ui.label("Average Mood and Energy Levels Over Time").classes("text-xl font-bold text-center text-gray-800")
+
+            ui.echart({
+                "tooltip": {
+                    "trigger": "axis"
+                },
+                "legend": {
+                    "data": ["Running Mean Mood", "Running Mean Energy"]
+                },
+                "xAxis": {
+                    "type": "category",
+                    "data": dates
+                },
+                "yAxis": {
+                    "type": "value",
+                    "min": 1,
+                    "max": 5
+                },
+                "series": [
+                    {
+                        "name": "Average Mood",
+                        "type": "line",
+                        "data": mood_values,
+                        "smooth": True,
+                        "lineStyle": {
+                            "color": "#42A5F5"
+                        }
+                    },
+                    {
+                        "name": "Average Energy",
+                        "type": "line",
+                        "data": energy_values,
+                        "smooth": True,
+                        "lineStyle": {
+                            "color": "#66BB6A"
+                        }
+                    }
+                ]
+            })
+
+
+@ui.page("/users/{username}/settings")
+async def users_settings_page(username: str, user_repo: UserRepositoryV2 = Depends(get_user_repository_v2)):
+    authenticated_user = await require_auth(username)
+    if not authenticated_user:
+        return
+    
+    user = await user_repo.get_by_name(username)
+    
+    ui.add_head_html('''
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                min-height: 100vh;
+            }
+            .dashboard-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            }
+            .nav-link {
+                transition: all 0.3s ease;
+                padding: 8px 16px;
+                border-radius: 8px;
+            }
+            .nav-link:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            .dashboard-card {
+                transition: all 0.3s ease;
+                border-radius: 16px;
+                background: white;
+            }
+            .dashboard-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            }
+            .input-field {
+                border-radius: 12px;
+                border: 2px solid #e5e7eb;
+                transition: all 0.3s ease;
+            }
+            .input-field:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+        </style>
+    ''')
+    
+    async def handle_save():
+        current_user = await user_repo.get_by_name(username)
+        if not current_user:
+            ui.notify("User not found", color="red")
+            return
+
+        new_name = name_input.value.strip()
+        new_email = email_input.value.strip()
+
+        updated_user = await user_repo.update_user(
+            current_user,
+            new_name or None,
+            new_email or None,
+        )
+
+        ui.notify("User Information Updated!", color="green", icon='check_circle')
+        await asyncio.sleep(0.7)
+
+        if updated_user.name != username:
+            ui.navigate.to(f"/users/{updated_user.name}/settings")
+        else:
+            ui.navigate.reload()
+
+    async def handle_delete():
+        current_user = await user_repo.get_by_name(username)
+        if not current_user:
+            ui.notify("User not found", color="red")
+            return
+    
+        await user_repo.delete(current_user.id)
+        ui.notify("User Deleted Successfully!", color="green", icon='check_circle')
+        await asyncio.sleep(0.7)
+        await ui.run_javascript("localStorage.clear()")
+        ui.navigate.to("/home")
+
+    with ui.header().classes('dashboard-header justify-between items-center px-8 py-4'):
+        with ui.row().classes('items-center gap-2'):
+            ui.label('💭').classes('text-3xl')
+            ui.label('Mindfuly').classes('text-2xl font-bold text-white')
+        with ui.row().classes("gap-6 items-center"):
+            ui.link("Overview", f"/users/{username}/home").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Journal", f"/users/{username}/journal").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Analytics", f"/users/{username}/analytics").classes("nav-link text-white text-base font-medium no-underline")
+            ui.link("Settings", f"/users/{username}/settings").classes("nav-link text-white text-base font-medium no-underline")
+            ui.button('🚪 Logout', on_click=lambda: handle_logout()).classes('bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium')
+
+    async def handle_logout():
+        await ui.run_javascript('localStorage.clear()')
+        ui.notify('Logged out successfully', color='green', icon='check_circle')
+        ui.navigate.to('/home')
+
+    with ui.column().classes("w-full items-center mt-10 px-4"):
+        ui.label("User Settings").classes("text-3xl font-bold mb-6 text-gray-800")
+
+        with ui.row().classes("w-full justify-center gap-10 max-w-6xl"):
+            with ui.card().classes("dashboard-card p-8 flex-1"):
+                ui.label("Account Information").classes("text-xl font-bold mb-4 text-gray-800")
+                
+                with ui.column().classes("w-full p-4 mb-6 border border-gray-300/40 rounded-xl bg-gray-50/30"):
+                    ui.label(f"Username: {user.name}").classes("mb-2 text-gray-700")
+                    ui.label(f"Email: {user.email}").classes("mb-4 text-gray-700")
+
+                ui.label("Update Information").classes("text-xl font-bold mb-4 text-gray-800")
+                name_input = ui.input("Display name", value=user.name).classes("input-field mb-3 w-full")
+                email_input = ui.input("Email", value=user.email).classes("input-field mb-3 w-full")
+                ui.button("💾 Save changes", on_click=handle_save).classes('btn-primary text-white px-6 py-3 rounded-lg mt-4')
+        
+            with ui.card().classes("dashboard-card p-8 flex-1"):
+                ui.label("Danger Zone").classes("text-xl font-bold mb-4 text-red-500")
+
+                def show_delete_confirmation():
+                    with ui.dialog() as dialog:
+                        with ui.card().classes("p-6 rounded-xl shadow-lg w-[450px]"):
+                            ui.label("Are you sure you want to delete your account?").classes("text-lg font-medium mb-6 text-center text-gray-800")
+                            ui.label("This action cannot be undone.").classes("text-sm text-gray-600 mb-6 text-center")
+                            with ui.row().classes("w-full justify-center gap-4"):
+                                ui.button("Cancel", on_click=dialog.close).classes("bg-gray-300 hover:bg-gray-400 text-white px-6 py-2 rounded-lg")
+                                ui.button("Delete", on_click=lambda: (handle_delete(), dialog.close())).classes("bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg")
+                        dialog.open()
+                
+                ui.button("🗑️ Delete Account", on_click=show_delete_confirmation).classes('bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg')
 
 
 
