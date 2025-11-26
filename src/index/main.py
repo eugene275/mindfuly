@@ -108,7 +108,7 @@ async def home_page():
         with ui.column().classes('max-w-6xl w-full items-center fade-in-up'):
             with ui.column().classes('items-center mb-8'):
                 ui.label('💭').classes('text-8xl mb-4')
-                ui.label('Mindfuly').classes('hero-title text-7xl font-extrabold mb-4')
+                ui.label('Mindfuly').classes('text-7xl font-extrabold mb-4 text-white')
                 ui.label('Your Personal Wellness & Mindfulness Companion').classes('text-2xl text-white font-light mb-12 text-center')
             
             with ui.row().classes('w-full justify-center gap-6 mb-12 flex-wrap'):
