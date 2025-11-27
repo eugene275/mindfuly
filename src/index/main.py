@@ -535,6 +535,15 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
             with ui.column().classes("bg-yellow-50 rounded-xl border p-4"):
                 weather_stats = await mood_log_repo.get_weather_mood_stats(user.id)
                 weekly_stats = await mood_log_repo.get_weekly_mood_stats(user.id)
+
+                def extract_weather_type(full_weather: str) -> str:
+
+                    if "–" in full_weather:
+                        weather_only = full_weather.split("–")[1].strip()
+                    else:
+                        weather_only = full_weather.strip()
+
+                    return weather_only
                 
                 def get_max_mood_weather(weather_stats):
                     if not weather_stats:
@@ -585,9 +594,14 @@ async def user_home_screen(username: str, user_repo: UserRepositoryV2 = Depends(
                 insights_mood_weather = []
                 
                 if (len(weather_stats) >= 1):
-                    happiest_mood_weather = get_max_mood_weather(weather_stats)
-                    saddest_mood_weather = get_min_mood_weather(weather_stats)
-                    neutral_mood_weather = get_neutral_mood_weather(weather_stats)
+                    no_temp1 = get_max_mood_weather(weather_stats)
+                    happiest_mood_weather = extract_weather_type(no_temp1)
+
+                    no_temp2 = get_min_mood_weather(weather_stats)
+                    saddest_mood_weather = extract_weather_type(no_temp2)
+
+                    no_temp3 = get_neutral_mood_weather(weather_stats)
+                    neutral_mood_weather = extract_weather_type(no_temp3)
 
                     insights_mood_weather.append(f"You tend to feel the most happy when it is {happiest_mood_weather}")
                     insights_mood_weather.append(f"You tend to feel the saddest when it is {saddest_mood_weather}")
