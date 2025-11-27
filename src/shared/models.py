@@ -125,7 +125,6 @@ class MoodLogRepositoryV2():
     # Get average mood, energy level, and total logs for all days of a week
     async def get_weekly_mood_stats(self, user_id: int) -> list[dict]:
         """
-        TODO:
         Get stats based on the days of the week
 
         Example:

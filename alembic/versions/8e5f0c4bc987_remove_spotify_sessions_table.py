@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     op.drop_index(op.f('ix_spotify_sessions_id'), table_name='spotify_sessions', if_exists=True)
-    op.drop_table('spotify_sessions')
+    op.drop_table('spotify_sessions', if_exists=True)
 
 
 def downgrade() -> None:

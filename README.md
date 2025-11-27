@@ -11,6 +11,9 @@ POSTGRES_HOST=db
 POSTGRES_USER=<some shared username>
 POSTGRES_PASSWORD=<some shared password>
 GITHUB_TOKEN=<some shared PAT token>
+JWT_SECRET_KEY=<some secret JWT key>
+WEATHER_API_KEY=<some shared weather API key>
+YOUTUBE_API_KEY=<some shared YouTube API key>
 ```
 
 2. Launch the application by running
