@@ -8,12 +8,13 @@ engine = None
 def get_db():
     global engine
     if not engine:
-        host = os.environ.get('POSTGRES_HOST')
-        username = os.environ.get('POSTGRES_USER')
-        password = os.environ.get('POSTGRES_PASSWORD')
-        
-        DATABASE_URL = f"postgresql+psycopg2://{username}:{password}@{host}:5432"
-        
+        host = os.environ['DATABASE_HOST']
+        username = os.environ['DATABASE_USER']
+        password = os.environ['DATABASE_PASSWORD']
+        dbname = os.environ['DATABASE_NAME']
+
+        DATABASE_URL = f"postgresql+psycopg2://{username}:{password}@{host}:5432/{dbname}"
+
         engine = create_engine(DATABASE_URL)
 
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
