@@ -1,3 +1,4 @@
+# tests/test_security.py
 import os
 import re
 import pathlib
@@ -5,7 +6,8 @@ import pytest
 
 # --- Configuration: adjust if you want different sensitivity or to whitelist files ---
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXCLUDE_DIRS = {'.git', '__pycache__', 'venv', '.venv', 'node_modules', '.github'}
+# Add 'tests' so our test file (and other test helpers) are not scanned
+EXCLUDE_DIRS = {'.git', '__pycache__', 'venv', '.venv', 'node_modules', '.github', 'tests'}
 SENSITIVE_PATH_KEYWORDS = ('/admin', '/users', '/settings', '/journal', '/analytics', '/admin/', '/users/')
 # Minimum secret length considered suspicious for literal string checks
 MIN_SUSPICIOUS_SECRET_LEN = 6
@@ -13,7 +15,6 @@ MIN_SUSPICIOUS_SECRET_LEN = 6
 # --- Helpers -------------------------------------------------------------------
 def is_text_file(path: pathlib.Path) -> bool:
     try:
-        # quick heuristic: attempt to decode
         with open(path, 'r', encoding='utf-8') as f:
             f.read(1024)
         return True
@@ -26,7 +27,7 @@ def iter_repo_files():
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
         for fn in files:
             full = pathlib.Path(root) / fn
-            # skip files inside .git etc
+            # skip files inside excluded dirs
             if any(part in EXCLUDE_DIRS for part in full.parts):
                 continue
             yield full
@@ -45,10 +46,14 @@ def test_no_hardcoded_secrets_or_env_files():
       - Files named exactly .env or .env.* (committed env files).
       - Simple assignments like SECRET_KEY = "...." or API_KEY = '...' in code.
       - Common suspicious env var names assigned literal values in code.
+    Heuristics avoid:
+      - Values that are clearly URLs or paths.
+      - Short example placeholders like "changeme" or "example".
     """
     secret_patterns = [
         re.compile(r'\b(?:SECRET|SECRET_KEY|API_KEY|API-KEY|APIKEY|TOKEN|ACCESS_TOKEN|AUTH_TOKEN|PASSWORD|PASS|DB_PASS|DB_PASSWORD|PRIVATE_TOKEN)\b', re.IGNORECASE),
     ]
+    # look for assignments like NAME = "value"
     literal_assignment_re = re.compile(
         r'\b(?P<name>[A-Z0-9_]*(?:SECRET|API|TOKEN|PASSWORD|PASS|KEY|DB)[A-Z0-9_]*)\b\s*[:=]\s*[\'"](?P<val>[^\'"]{'+str(MIN_SUSPICIOUS_SECRET_LEN)+',})[\'"]',
         re.IGNORECASE
@@ -59,7 +64,6 @@ def test_no_hardcoded_secrets_or_env_files():
     for f in iter_repo_files():
         # detect committed .env files
         if f.name.startswith('.env'):
-            # skip obvious sample files but flag them if contain non-empty keys
             text = read_text(f)
             if text.strip():
                 committed_env_files.append((str(f.relative_to(REPO_ROOT)), text.splitlines()[:8]))
@@ -74,11 +78,16 @@ def test_no_hardcoded_secrets_or_env_files():
             # look for assignments with literal strings
             for m in literal_assignment_re.finditer(text):
                 name = m.group('name')
-                val = m.group('val')
-                # don't flag obvious test placeholders like "changeme"
+                val = m.group('val').strip()
+                # ignore obvious non-secret values:
+                # - URLs or URIs
+                # - paths that start with '/'
+                # - placeholders like "changeme", "example", "test"
+                if val.startswith('http://') or val.startswith('https://') or val.startswith('/'):
+                    continue
                 if re.search(r'change|example|your-|xxx|test', val, re.IGNORECASE):
                     continue
-                literal_secrets.append((str(f.relative_to(REPO_ROOT)), name, val[:80]))
+                literal_secrets.append((str(f.relative_to(REPO_ROOT)), name, val[:120]))
 
     msgs = []
     if committed_env_files:
@@ -142,16 +151,15 @@ def test_no_private_keys_in_repo():
         if not is_text_file(f):
             continue
         name = f.name.lower()
+        # check by filename first for obvious key files
         if name in ('id_rsa', 'id_dsa') or name.endswith('.pem') or name.endswith('.key'):
-            # check contents for private key header
             text = read_text(f)
             if any(h in text for h in pem_headers):
                 suspicious_files.append((str(f.relative_to(REPO_ROOT)), 'contains PEM private key header'))
-            # also flag if filename itself is obviously private
             elif re.search(r'private', name):
                 suspicious_files.append((str(f.relative_to(REPO_ROOT)), 'filename contains "private" or looks like a key file'))
-
         else:
+            # check content for a private key header (but we already avoid scanning tests/ so this won't hit our test file)
             text = read_text(f)
             if any(h in text for h in pem_headers):
                 suspicious_files.append((str(f.relative_to(REPO_ROOT)), 'embedded PEM private key header found'))
@@ -168,13 +176,9 @@ def test_sensitive_endpoints_require_auth():
     """
     Heuristic static check:
     - Find ui.page("/some/path") or app.get/post decorators and check
-      the following function body (a short region) for presence of authentication checks:
-      look for 'require_auth(' or 'verify_token' or 'Depends(get_current_user' or similar.
-    - If a path appears sensitive (contains /admin, /users, /settings, /journal...), but
-      no auth check is found in the body snippet, fail and list the endpoint.
+      the following function body (a short region) for presence of authentication checks.
     """
     decorator_re = re.compile(r'@(?:ui|app)\.(?:page|get|post|put|delete)\s*\(\s*["\'](?P<path>[^"\']+)["\']\s*\)')
-    # auth indicators: add more tokens if your project uses a different pattern
     auth_indicators = re.compile(r'\b(require_auth|verify_token|verify_auth|Depends\(\s*get_current_user|Depends\(\s*get_current_active_user|login_required|@login_required)\b', re.IGNORECASE)
 
     missing_auth = []
@@ -185,15 +189,11 @@ def test_sensitive_endpoints_require_auth():
         text = read_text(f)
         for dm in decorator_re.finditer(text):
             path = dm.group('path')
-            # only focus on potentially sensitive paths
             if not any(k in path for k in SENSITIVE_PATH_KEYWORDS):
                 continue
-            # capture a region after decorator to look into the function
             start_idx = dm.end()
-            region = text[start_idx:start_idx + 4000]  # inspect next chars (function body)
-            # look for auth indicators
+            region = text[start_idx:start_idx + 4000]
             if not auth_indicators.search(region):
-                # Provide context: function name if possible
                 fn_match = re.search(r'def\s+([a-zA-Z0-9_]+)\s*\(', region)
                 fn_name = fn_match.group(1) if fn_match else "<unknown>"
                 missing_auth.append((str(f.relative_to(REPO_ROOT)), path, fn_name))
@@ -201,6 +201,6 @@ def test_sensitive_endpoints_require_auth():
     if missing_auth:
         msgs = ["Sensitive endpoints without obvious auth checks found:"]
         for p, path, fn in missing_auth:
-            msgs.append(f" - {p} -> {path} (function: {fn}) - no 'require_auth/verify_token/Depends(get_current_user)' detected in the nearby function body.")
+            msgs.append(f" - {p} -> {path} (function: {fn}) - no 'require_auth/verify_token/Depends(get_current_user)' detected nearby.")
         msgs.append("\nThis is a heuristic check — review listed functions and add authentication/authorization checks where appropriate.")
         pytest.fail("\n".join(msgs))
