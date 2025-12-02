@@ -16,9 +16,9 @@ config = context.config
 # from the host env
 load_dotenv()
 section = config.config_ini_section
-config.set_section_option(section, "DATABASE_HOST", os.environ.get("POSTGRES_HOST"))
-config.set_section_option(section, "DATABASE_USER", os.environ.get("POSTGRES_USER"))
-config.set_section_option(section, "DATABASE_PASSWORD", os.environ.get("POSTGRES_PASSWORD"))
+config.set_section_option(section, "DATABASE_HOST", os.environ.get("DATABASE_HOST"))
+config.set_section_option(section, "DATABASE_USER", os.environ.get("DATABASE_USER"))
+config.set_section_option(section, "DATABASE_PASSWORD", os.environ.get("DATABASE_PASSWORD"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
